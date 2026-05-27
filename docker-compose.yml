@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.5
+    container_name: opensearch
+
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=SOCExam!1234
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+    ports:
+      - "9200:9200"
+
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+
+    networks:
+      - socnet
+
+  dashboards:
+    image: opensearchproject/opensearch-dashboards:2.19.5
+    container_name: dashboards
+
+    ports:
+      - "5601:5601"
+
+    environment:
+      - OPENSEARCH_HOSTS=["https://opensearch:9200"]
+      - OPENSEARCH_SSL_VERIFICATIONMODE=none
+      - OPENSEARCH_USERNAME=admin
+      - OPENSEARCH_PASSWORD=SOCExam!1234
+
+    depends_on:
+      - opensearch
+
+    networks:
+      - socnet
+
+  logstash:
+    build: ./logstash
+    container_name: logstash
+
+    ports:
+      - "5044:5044"
+
+    volumes:
+      - ./logstash/pipeline.conf:/usr/share/logstash/pipeline/logstash.conf
+
+    depends_on:
+      - opensearch
+
+    networks:
+      - socnet
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.19.4
+    container_name: filebeat
+
+    user: root
+
+    command: filebeat -e --strict.perms=false
+
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
+      - ./logs:/logs
+
+    depends_on:
+      - logstash
+
+    networks:
+      - socnet
+
+  generator:
+    image: ubuntu:24.04
+    container_name: log-generator
+
+    volumes:
+      - ./generator/generate_vpn_logs.sh:/generate_vpn_logs.sh
+      - ./logs:/logs
+
+    command: bash -c "chmod +x /generate_vpn_logs.sh && /generate_vpn_logs.sh"
+
+    networks:
+      - socnet
+
+volumes:
+  opensearch-data:
+
+networks:
+  socnet:

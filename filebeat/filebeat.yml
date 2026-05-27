@@ -1,0 +1,21 @@
+filebeat.inputs:
+
+- type: log
+  enabled: true
+
+  paths:
+    - /logs/vpn.log
+
+  fields:
+    log_type: vpn
+
+  fields_under_root: true
+
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+
+processors:
+  - add_host_metadata: ~
+  - add_cloud_metadata: ~
